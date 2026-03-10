@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 400px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      color: #333;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 .icon { font-size: 20px; }
+    .section {
+      margin-bottom: 14px;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    input[type="text"] {
+      width: 80px;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .prefix-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    small {
+      color: #777;
+      display: block;
+      margin-top: 4px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      padding: 7px 16px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #fff;
+    }
+    button:hover { background: #f5f5f5; }
+    button.primary {
+      background: #1a73e8;
+      color: #fff;
+      border-color: #1a73e8;
+    }
+    button.primary:hover { background: #1557b0; }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      display: none;
+    }
+    #status.info { display: block; background: #e8f0fe; color: #174ea6; }
+    #status.error { display: block; background: #fce8e6; color: #c5221f; }
+    #status.success { display: block; background: #e6f4ea; color: #137333; }
+    progress {
+      width: 100%;
+      height: 6px;
+      margin-top: 8px;
+      display: none;
+    }
+    progress.visible { display: block; }
+    #log {
+      margin-top: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: #666;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 6px;
+      display: none;
+    }
+    #log.visible { display: block; }
+    #log div { margin-bottom: 2px; }
+    .tenant-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      margin-bottom: 12px;
+      background: #e8f0fe;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #174ea6;
+    }
+    .tenant-bar .tenant-label {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tenant-bar select {
+      flex: 1;
+      font-size: 12px;
+      padding: 2px 4px;
+      border: 1px solid #a8c7fa;
+      border-radius: 3px;
+      background: #fff;
+      color: #174ea6;
+    }
+    .tenant-bar .tenant-static {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .settings-toggle {
+      font-size: 12px;
+      color: #1a73e8;
+      cursor: pointer;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .settings-toggle:hover { text-decoration: underline; }
+    .settings-panel {
+      display: none;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+    .settings-panel.visible { display: block; }
+    .settings-panel label {
+      margin-bottom: 6px;
+    }
+    .settings-panel input[type="text"] {
+      width: 100%;
+    }
+    .settings-panel textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: monospace;
+      resize: vertical;
+    }
+    .setting-group {
+      margin-bottom: 10px;
+    }
+    .setting-group .label {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1><span class="icon">📄</span> Inn-Reach Paging Slips</h1>
+
+  <div id="detect-status" style="display:none;">
+    <div style="padding:8px;border-radius:4px;font-size:13px;background:#fff8e1;color:#856404;margin-bottom:12px;">
+      <div id="detect-msg">Detecting FOLIO session…</div>
+    </div>
+  </div>
+
+  <div id="tenant-bar" class="tenant-bar" style="display:none;">
+    <span class="tenant-label">Tenant:</span>
+    <select id="tenant-select" style="display:none;"></select>
+    <span id="tenant-name" class="tenant-static"></span>
+  </div>
+
+  <div id="main-ui">
+    <div class="section">
+      <label>
+        <input type="checkbox" id="all-sps">
+        Generate for <strong>all</strong> service points
+      </label>
+      <div class="prefix-row">
+        <span>Or filter by prefix:</span>
+        <input type="text" id="prefix" value="m" placeholder="e.g. m">
+      </div>
+    </div>
+
+    <span class="settings-toggle" id="toggle-settings">⚙ Settings</span>
+    <div class="settings-panel" id="settings-panel">
+      <div class="setting-group">
+        <div class="label">FOLIO / Okapi URL</div>
+        <input type="text" id="okapi-url" placeholder="e.g. https://okapi-folio.example.edu">
+        <small>Auto-detected from page if possible</small>
+      </div>
+      <div class="setting-group">
+        <div class="label">Tenant</div>
+        <input type="text" id="okapi-tenant" placeholder="e.g. fs00001234">
+        <small>Auto-detected from page if possible</small>
+      </div>
+      <div class="setting-group">
+        <div class="label">Central Server</div>
+        <select id="central-server-id">
+          <option value="">Auto-detecting…</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <div class="label">Agency Code Mappings (JSON)</div>
+        <textarea id="agency-map" placeholder='{"code": "Library Name", ...}'>{}</textarea>
+        <small>Map agency codes to display names, e.g. {"ab123": "My University"}</small>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #e0e0e0;margin:14px 0;">
+
+    <div class="section">
+      <div class="label" style="font-size:13px;font-weight:600;margin-bottom:6px;">Single Slip Lookup</div>
+      <div class="prefix-row">
+        <input type="text" id="single-lookup" style="width:100%;" placeholder="Item barcode or tracking ID">
+      </div>
+      <small>Print a slip for one specific transaction</small>
+    </div>
+
+    <div class="btn-row">
+      <button class="primary" id="btn-generate">Generate All Slips</button>
+      <button id="btn-single">Print Single Slip</button>
+    </div>
+
+    <div id="status"></div>
+    <progress id="progress" value="0" max="100"></progress>
+    <div id="log"></div>
+  </div>
+
+  <script src="lib/folio-session.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
