@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <style>
@@ -43,7 +43,7 @@
       margin-top: 6px;
     }
     small {
-      color: #777;
+      color: #595959;
       display: block;
       margin-top: 4px;
     }
@@ -71,6 +71,10 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    :focus-visible {
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
     #status {
       margin-top: 12px;
       padding: 8px;
@@ -93,7 +97,7 @@
       max-height: 150px;
       overflow-y: auto;
       font-size: 11px;
-      color: #666;
+      color: #545454;
       border: 1px solid #eee;
       border-radius: 4px;
       padding: 6px;
@@ -137,6 +141,10 @@
       cursor: pointer;
       margin-bottom: 8px;
       display: inline-block;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
     }
     .settings-toggle:hover { text-decoration: underline; }
     .settings-panel {
@@ -175,18 +183,18 @@
   </style>
 </head>
 <body>
-  <h1><span class="icon">📄</span> Inn-Reach Paging Slips</h1>
+  <h1><span class="icon" aria-hidden="true">📄</span> Inn-Reach Paging Slips</h1>
 
   <div id="detect-status" style="display:none;">
     <div style="padding:8px;border-radius:4px;font-size:13px;background:#fff8e1;color:#856404;margin-bottom:12px;">
-      <div id="detect-msg">Detecting FOLIO session…</div>
+      <div id="detect-msg" role="status" aria-live="polite">Detecting FOLIO session…</div>
       <button id="btn-grant-access" style="display:none;margin-top:8px;padding:5px 12px;font-size:13px;border:1px solid #856404;border-radius:4px;background:#fff;color:#856404;cursor:pointer;">Grant Site Access</button>
     </div>
   </div>
 
   <div id="tenant-bar" class="tenant-bar" style="display:none;">
     <span class="tenant-label">Tenant:</span>
-    <select id="tenant-select" style="display:none;"></select>
+    <select id="tenant-select" aria-label="Tenant" style="display:none;"></select>
     <span id="tenant-name" class="tenant-static"></span>
   </div>
 
@@ -197,31 +205,31 @@
         Generate for <strong>all</strong> service points
       </label>
       <div class="prefix-row">
-        <span>Or filter by prefix:</span>
+        <label for="prefix">Or filter by prefix:</label>
         <input type="text" id="prefix" placeholder="e.g. m">
       </div>
     </div>
 
-    <span class="settings-toggle" id="toggle-settings">⚙ Settings</span>
+    <button class="settings-toggle" id="toggle-settings" aria-expanded="false" aria-controls="settings-panel">⚙ Settings</button>
     <div class="settings-panel" id="settings-panel">
       <div class="setting-group">
-        <div class="label">FOLIO API Gateway</div>
+        <label for="okapi-url" class="label">FOLIO API Gateway</label>
         <input type="text" id="okapi-url" placeholder="e.g. https://api-tenant-domain.dev.folio.org">
         <small>Auto-detected from page if possible</small>
       </div>
       <div class="setting-group">
-        <div class="label">Tenant</div>
+        <label for="okapi-tenant" class="label">Tenant</label>
         <input type="text" id="okapi-tenant" placeholder="e.g. fs00001234">
         <small>Auto-detected from page if possible</small>
       </div>
       <div class="setting-group">
-        <div class="label">Central Server</div>
+        <label for="central-server-id" class="label">Central Server</label>
         <select id="central-server-id">
           <option value="">Auto-detecting…</option>
         </select>
       </div>
       <div class="setting-group">
-        <div class="label">Agency Code Mappings (JSON)</div>
+        <label for="agency-map" class="label">Agency Code Mappings (JSON)</label>
         <textarea id="agency-map" placeholder='{"code": "Library Name", ...}'>{}</textarea>
         <small>Map agency codes to display names, e.g. {"ab123": "My University"}</small>
       </div>
@@ -230,7 +238,7 @@
     <hr style="border:none;border-top:1px solid #e0e0e0;margin:14px 0;">
 
     <div class="section">
-      <div class="label" style="font-size:13px;font-weight:600;margin-bottom:6px;">Single Slip Lookup</div>
+      <label for="single-lookup" class="label" style="font-size:13px;font-weight:600;margin-bottom:6px;">Single Slip Lookup</label>
       <div class="prefix-row">
         <input type="text" id="single-lookup" style="width:100%;" placeholder="Item barcode or tracking ID">
       </div>
@@ -242,9 +250,9 @@
       <button id="btn-single">Print Single Slip</button>
     </div>
 
-    <div id="status"></div>
-    <progress id="progress" value="0" max="100"></progress>
-    <div id="log"></div>
+    <div id="status" role="status" aria-live="polite"></div>
+    <progress id="progress" value="0" max="100" aria-label="Slip generation progress"></progress>
+    <div id="log" aria-live="polite" aria-label="Activity log"></div>
   </div>
 
   <script src="lib/folio-session.js"></script>

@@ -66,7 +66,9 @@
   // ======================== SETTINGS TOGGLE ========================
   els.toggleSettings.addEventListener("click", function () {
     els.settingsPanel.classList.toggle("visible");
-    els.toggleSettings.textContent = els.settingsPanel.classList.contains("visible")
+    var expanded = els.settingsPanel.classList.contains("visible");
+    els.toggleSettings.setAttribute("aria-expanded", String(expanded));
+    els.toggleSettings.textContent = expanded
       ? "⚙ Hide Settings"
       : "⚙ Settings";
   });
@@ -95,11 +97,13 @@
   function showSettings() {
     els.settingsPanel.classList.add("visible");
     els.toggleSettings.textContent = "⚙ Hide Settings";
+    els.toggleSettings.setAttribute("aria-expanded", "true");
   }
 
   function hideSettings() {
     els.settingsPanel.classList.remove("visible");
     els.toggleSettings.textContent = "⚙ Settings";
+    els.toggleSettings.setAttribute("aria-expanded", "false");
   }
 
   /**
@@ -348,7 +352,7 @@
       });
 
       const fullHTML =
-        "<!DOCTYPE html><html><head><title>Inn-Reach Paging Slips (" +
+        "<!DOCTYPE html><html lang=\"en\"><head><title>Inn-Reach Paging Slips (" +
         slips.length + ")</title></head><body>" +
         (slips.length > 0 ? slips.join("\n") : "<p>No paging slips to print.</p>") +
         "</body></html>";
@@ -494,7 +498,7 @@
         "</div>";
 
       const fullHTML =
-        "<!DOCTYPE html><html><head><title>Inn-Reach Paging Slip — " +
+        "<!DOCTYPE html><html lang=\"en\"><head><title>Inn-Reach Paging Slip \u2014 " +
         escapeHtml(item.barcode || match.trackingId) +
         "</title></head><body>" + rendered + "</body></html>";
 
