@@ -13,6 +13,7 @@
     mainUI: document.getElementById("main-ui"),
     detectStatus: document.getElementById("detect-status"),
     detectMsg: document.getElementById("detect-msg"),
+    btnGrantAccess: document.getElementById("btn-grant-access"),
     tenantBar: document.getElementById("tenant-bar"),
     tenantSelect: document.getElementById("tenant-select"),
     tenantName: document.getElementById("tenant-name"),
@@ -594,7 +595,7 @@
     }
     els.tenantBar.style.display = "flex";
 
-    var allSessions = FolioSession.getAllSessions();
+    var allSessions = FolioSession.getAllSessions().filter(function (s) { return !!s.tenant; });
     if (allSessions.length > 1) {
       els.tenantSelect.style.display = "";
       els.tenantName.style.display = "none";
@@ -608,14 +609,21 @@
       });
       FolioSession.getKnownTenants().then(function (known) {
         var sessionTenants = allSessions.map(function (s) { return s.tenant; });
-        known.forEach(function (t) {
-          if (t && sessionTenants.indexOf(t) === -1) {
+        var remaining = known.filter(function (t) {
+          return t && sessionTenants.indexOf(t) === -1;
+        });
+        Promise.all(remaining.map(function (t) {
+          return FolioSession.loadTenantProfile(t).then(function (profile) {
+            return { tenant: t, url: (profile && profile.okapiUrl) || "" };
+          });
+        })).then(function (entries) {
+          entries.forEach(function (e) {
             var opt = document.createElement("option");
-            opt.value = t;
-            opt.textContent = t + " (saved)";
-            opt.dataset.url = "";
+            opt.value = e.tenant;
+            opt.textContent = e.tenant + (e.url ? " — " + e.url : " (saved)");
+            opt.dataset.url = e.url;
             els.tenantSelect.appendChild(opt);
-          }
+          });
         });
       });
       els.tenantSelect.value = tenantId;
@@ -635,6 +643,57 @@
       "okapiTenant"
     );
 
+    els.detectStatus.style.display = "block";
+    els.detectMsg.textContent = "Detecting FOLIO session…";
+
+    // Check if we already have host permission for the active tab
+    var tabOrigin = await FolioSession.getActiveTabOrigin();
+    var tabUrl = await FolioSession.getActiveTabUrl();
+    var wildcardPattern = FolioSession.getWildcardPattern(tabUrl);
+    var hasPermission = wildcardPattern
+      ? await new Promise(function (r) {
+          chrome.permissions.contains({ origins: [wildcardPattern] }, r);
+        })
+      : false;
+
+    // Also fall back to checking exact origin (in case user granted it previously)
+    if (!hasPermission && tabOrigin) {
+      hasPermission = await FolioSession.hasHostPermission(tabOrigin);
+    }
+
+    if (tabOrigin && !hasPermission) {
+      var displayDomain = wildcardPattern
+        ? wildcardPattern.replace("https://", "").replace("/*", "")
+        : tabOrigin;
+      els.detectMsg.textContent =
+        "This extension needs access to " + displayDomain + " to detect your FOLIO session.";
+      els.btnGrantAccess.style.display = "";
+      els.btnGrantAccess.onclick = async function () {
+        els.btnGrantAccess.disabled = true;
+        els.btnGrantAccess.textContent = "Requesting…";
+        var patterns = [wildcardPattern || (tabOrigin + "/*")];
+        var granted = await new Promise(function (r) {
+          chrome.permissions.request({ origins: patterns }, r);
+        });
+        if (granted) {
+          els.btnGrantAccess.style.display = "none";
+          els.detectMsg.textContent = "Access granted. Detecting FOLIO session…";
+          await continueInit();
+        } else {
+          els.btnGrantAccess.disabled = false;
+          els.btnGrantAccess.textContent = "Grant Site Access";
+          els.detectMsg.textContent =
+            "Permission denied. Click \"Grant Site Access\" to try again, or open Settings to enter connection details manually.";
+          showSettings();
+        }
+      };
+      return;
+    }
+
+    await continueInit();
+  }
+
+  async function continueInit() {
     els.detectStatus.style.display = "block";
     els.detectMsg.textContent = "Detecting FOLIO session…";
 

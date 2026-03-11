@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Generate paging slips for Inn-Reach transactions directly from the FOLIO UI.",
   "permissions": ["activeTab", "storage", "scripting", "cookies"],
-  "host_permissions": ["*://*/*"],
+  "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

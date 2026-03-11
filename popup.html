@@ -180,6 +180,7 @@
   <div id="detect-status" style="display:none;">
     <div style="padding:8px;border-radius:4px;font-size:13px;background:#fff8e1;color:#856404;margin-bottom:12px;">
       <div id="detect-msg">Detecting FOLIO session…</div>
+      <button id="btn-grant-access" style="display:none;margin-top:8px;padding:5px 12px;font-size:13px;border:1px solid #856404;border-radius:4px;background:#fff;color:#856404;cursor:pointer;">Grant Site Access</button>
     </div>
   </div>
 
@@ -197,15 +198,15 @@
       </label>
       <div class="prefix-row">
         <span>Or filter by prefix:</span>
-        <input type="text" id="prefix" value="m" placeholder="e.g. m">
+        <input type="text" id="prefix" placeholder="e.g. m">
       </div>
     </div>
 
     <span class="settings-toggle" id="toggle-settings">⚙ Settings</span>
     <div class="settings-panel" id="settings-panel">
       <div class="setting-group">
-        <div class="label">FOLIO / Okapi URL</div>
-        <input type="text" id="okapi-url" placeholder="e.g. https://okapi-folio.example.edu">
+        <div class="label">FOLIO API Gateway</div>
+        <input type="text" id="okapi-url" placeholder="e.g. https://api-tenant-domain.dev.folio.org">
         <small>Auto-detected from page if possible</small>
       </div>
       <div class="setting-group">
