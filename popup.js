@@ -8,6 +8,11 @@
 
   FolioSession.setLogPrefix("[PagingSlips]");
 
+  // ======================== CACHED MAPS ========================
+  var cachedAgencyCodeMap = {};   // { centralServerId: { agencyCode: description } }
+  var cachedPatronCodeMap = {};   // { centralServerId: { centralPatronType: description } }
+  var cachedLocalServerCode = "";
+
   // ======================== DOM REFS ========================
   const els = {
     mainUI: document.getElementById("main-ui"),
@@ -29,7 +34,6 @@
     okapiUrlInput: document.getElementById("okapi-url"),
     okapiTenantInput: document.getElementById("okapi-tenant"),
     centralServerId: document.getElementById("central-server-id"),
-    agencyMap: document.getElementById("agency-map"),
     singleLookup: document.getElementById("single-lookup"),
     btnSingle: document.getElementById("btn-single"),
   };
@@ -40,7 +44,6 @@
     return {
       okapiUrl: els.okapiUrlInput.value.trim(),
       centralServerId: els.centralServerId.value,
-      agencyMap: els.agencyMap.value,
       prefix: els.prefix.value,
       allSPs: els.allSPs.checked,
     };
@@ -52,7 +55,6 @@
     if (profile.centralServerId != null) {
       els.centralServerId.dataset.savedValue = profile.centralServerId;
     }
-    if (profile.agencyMap) els.agencyMap.value = profile.agencyMap;
     if (profile.prefix) els.prefix.value = profile.prefix;
     if (profile.allSPs != null) els.allSPs.checked = profile.allSPs;
   }
@@ -196,17 +198,10 @@
 
     const BATCH_SIZE = 10;
     const centralServerId = els.centralServerId.value.trim();
-    let agencyCodeMap;
-    try {
-      agencyCodeMap = JSON.parse(els.agencyMap.value);
-    } catch (_) {
-      setStatus("Invalid JSON in agency code mappings. Open Settings to fix.", "error");
-      showSettings();
-      return;
-    }
+    var agencyCodeMap = cachedAgencyCodeMap[centralServerId] || {};
     if (!agencyCodeMap || Object.keys(agencyCodeMap).length === 0) {
       setStatus(
-        "Agency code mappings are not configured. Open Settings to add them before generating.",
+        "Agency code mappings not available. Check central server selection in Settings.",
         "error"
       );
       showSettings();
@@ -307,7 +302,7 @@
         const item = itemsMap[txn.hold.folioItemId];
         if (!item) continue;
 
-        const contextObj = buildSlipContext(txn, item, agencyCodeMap);
+        const contextObj = buildSlipContext(txn, item, agencyCodeMap, cachedPatronCodeMap, cachedLocalServerCode);
         const request = requestsMap[item.id];
         if (request) {
           if (!(request.status || "").startsWith("Open - Not yet filled")) {
@@ -373,20 +368,20 @@
 
   // ======================== SINGLE SLIP LOOKUP ========================
 
-  function buildSlipContext(txn, item, agencyCodeMap) {
-    const ecnc = item.effectiveCallNumberComponents || {};
-    const volumeEnum =
+  function buildSlipContext(txn, item, agencyCodeMap, patronCodeMap, localServerCode) {
+    var ecnc = item.effectiveCallNumberComponents || {};
+    var volumeEnum =
       (item.displaySummary || "").trim() ||
       (
         ((item.volume || "").trim() || (item.enumeration || "").trim() || "") +
         " " +
         (item.chronology || "")
       ).trim();
-    const callParts = [ecnc.prefix, ecnc.callNumber, ecnc.suffix, volumeEnum]
+    var callParts = [ecnc.prefix, ecnc.callNumber, ecnc.suffix, volumeEnum]
       .map(function (v) { return v == null ? "" : String(v); })
       .filter(Boolean);
 
-    const itemObj = {
+    var itemObj = {
       title: item.title || "",
       author:
         item.contributorNames && item.contributorNames.length
@@ -396,15 +391,26 @@
       effectiveCallNumber: callParts.join(" ").trim(),
       effectiveLocationFolioName:
         (item.effectiveLocation && item.effectiveLocation.name) || "",
+      hrid: item.hrid || "",
+      shelvingOrder: item.effectiveShelvingOrder || "",
     };
 
-    const pickupParts = (txn.hold.pickupLocation || "").split(":");
-    const transactionObj = {
+    var hold = txn.hold || {};
+    var pickupParts = (hold.pickupLocation || "").split(":");
+    var centralServerId = hold.centralServerId || "";
+    var transactionObj = {
+      centralServerCode: hold.centralServerCode || "",
+      localServerCode: localServerCode || "",
       pickupLocationPrintName: pickupParts.length > 2 ? pickupParts[2] : "",
-      patronAgencyCode: txn.hold.patronAgencyCode || "",
-      itemAgencyDescription: agencyCodeMap[txn.hold.itemAgencyCode] || "",
-      itemAgencyCode: txn.hold.itemAgencyCode || "",
-      patronName: txn.hold.patronName || "",
+      pickupLocationCode: pickupParts.length > 0 ? pickupParts[0] : "",
+      pickupLocationDeliveryStop: pickupParts.length > 3 ? pickupParts[3] : "",
+      patronAgencyCode: hold.patronAgencyCode || "",
+      patronAgencyDescription: agencyCodeMap[hold.patronAgencyCode] || "",
+      itemAgencyCode: hold.itemAgencyCode || "",
+      itemAgencyDescription: agencyCodeMap[hold.itemAgencyCode] || "",
+      patronName: hold.patronName || "",
+      patronTypeCode: hold.centralPatronType || "",
+      patronTypeDescription: (patronCodeMap[centralServerId] || {})[hold.centralPatronType] || "",
     };
 
     return { item: itemObj, innReachTransaction: transactionObj };
@@ -426,13 +432,7 @@
     }
 
     const centralServerId = els.centralServerId.value.trim();
-    let agencyCodeMap;
-    try {
-      agencyCodeMap = JSON.parse(els.agencyMap.value);
-    } catch (_) {
-      setStatus("Invalid JSON in agency code mappings.", "error");
-      return;
-    }
+    var agencyCodeMap = cachedAgencyCodeMap[centralServerId] || {};
 
     saveCurrentSettings();
     hideSettings();
@@ -491,7 +491,7 @@
       );
       const template = templateData.template;
 
-      const contextObj = buildSlipContext(match, item, agencyCodeMap);
+      const contextObj = buildSlipContext(match, item, agencyCodeMap, cachedPatronCodeMap, cachedLocalServerCode);
       const rendered =
         '<div style="page-break-after: always;">' +
         renderMustache(template, contextObj) +
@@ -544,28 +544,51 @@
           }
         }
 
-        var agencyCodes = [];
-        centralServers.forEach(function (cs) {
-          (cs.localAgencies || []).forEach(function (agency) {
-            if (agency.code && agencyCodes.indexOf(agency.code) === -1) {
-              agencyCodes.push(agency.code);
+        // Store localServerCode from selected central server
+        var selectedCs = centralServers.find(function (cs) {
+          return cs.id === els.centralServerId.value;
+        });
+        if (selectedCs) {
+          cachedLocalServerCode = selectedCs.localServerCode || "";
+        }
+      }
+
+      // Fetch agency code → description map from the agencies endpoint
+      try {
+        var agenciesData = await FolioSession.folioGet("/inn-reach/central-servers/agencies");
+        var csAgencies = agenciesData.centralServerAgencies || [];
+        cachedAgencyCodeMap = {};
+        csAgencies.forEach(function (server) {
+          var csId = server.centralServerId || "";
+          var map = {};
+          (server.agencies || []).forEach(function (agency) {
+            if (agency.agencyCode && agency.description) {
+              map[agency.agencyCode] = agency.description;
             }
           });
+          cachedAgencyCodeMap[csId] = map;
         });
+      } catch (e) {
+        console.warn("[PagingSlips] Agency code fetch error:", e.message);
+      }
 
-        var needsSetup = false;
-        try {
-          var mapVal = JSON.parse(els.agencyMap.value);
-          needsSetup = !mapVal || Object.keys(mapVal).length === 0;
-        } catch (_) {
-          needsSetup = true;
-        }
-
-        if (needsSetup && agencyCodes.length > 0) {
-          var codeMap = {};
-          agencyCodes.sort().forEach(function (code) { codeMap[code] = ""; });
-          els.agencyMap.value = JSON.stringify(codeMap, null, 2);
-        }
+      // Fetch patron type mappings
+      try {
+        var ptData = await FolioSession.folioGet("/inn-reach/central-servers/patron-types");
+        var csPatronTypes = ptData.centralServerPatronTypes || [];
+        cachedPatronCodeMap = {};
+        csPatronTypes.forEach(function (cpt) {
+          var csId = cpt.centralServerId || "";
+          var map = {};
+          (cpt.patronTypes || []).forEach(function (pt) {
+            if (pt.centralPatronType != null && pt.description) {
+              map[pt.centralPatronType] = pt.description;
+            }
+          });
+          cachedPatronCodeMap[csId] = map;
+        });
+      } catch (e) {
+        console.warn("[PagingSlips] Patron type fetch error:", e.message);
       }
     } catch (e) {
       console.warn("[PagingSlips] Could not fetch central server config:", e.message);
@@ -643,7 +666,7 @@
   async function init() {
     // Migrate old flat settings to per-tenant format
     await FolioSession.migrateOldSettings(
-      ["okapiUrl", "okapiTenant", "centralServerId", "agencyMap", "prefix", "allSPs"],
+      ["okapiUrl", "okapiTenant", "centralServerId", "prefix", "allSPs"],
       "okapiTenant"
     );
 
@@ -759,46 +782,25 @@
     // Save this tenant
     FolioSession.saveTenantProfile(currentTenant, gatherCurrentProfile());
 
-    // Check if agency map needs user input
-    var needsSetup = false;
-    try {
-      var mapVal = JSON.parse(els.agencyMap.value);
-      if (!mapVal || Object.keys(mapVal).length === 0) {
-        needsSetup = true;
-      } else {
-        needsSetup = Object.values(mapVal).every(function (v) { return !v; });
-      }
-    } catch (_) {
-      needsSetup = true;
+    if (tenantSwitched) {
+      els.detectStatus.style.display = "block";
+      els.detectMsg.textContent = "Switched to " + currentTenant + " — settings loaded.";
+      setTimeout(function () { els.detectStatus.style.display = "none"; }, 3000);
+    } else {
+      els.detectStatus.style.display = "none";
     }
 
-    if (needsSetup) {
+    // Verify API connectivity
+    try {
+      await FolioSession.folioGetAll("/service-points", "servicepoints");
+    } catch (e) {
+      console.warn("[PagingSlips] Could not fetch service points:", e.message);
       els.detectStatus.style.display = "block";
-      els.detectMsg.textContent = tenantSwitched
-        ? "Switched to " + currentTenant + ". Fill in agency code names in Settings before generating."
-        : "Agency codes detected. Please fill in the library names in Settings below before generating slips.";
+      els.detectMsg.textContent =
+        "Connected to " + FolioSession.getUrl() + " but API call failed (" +
+        e.message.split("\n")[0] +
+        "). Check Settings and make sure you are logged into FOLIO.";
       showSettings();
-    } else {
-      if (tenantSwitched) {
-        els.detectStatus.style.display = "block";
-        els.detectMsg.textContent = "Switched to " + currentTenant + " — settings loaded.";
-        setTimeout(function () { els.detectStatus.style.display = "none"; }, 3000);
-      } else {
-        els.detectStatus.style.display = "none";
-      }
-
-      // Verify API connectivity
-      try {
-        await FolioSession.folioGetAll("/service-points", "servicepoints");
-      } catch (e) {
-        console.warn("[PagingSlips] Could not fetch service points:", e.message);
-        els.detectStatus.style.display = "block";
-        els.detectMsg.textContent =
-          "Connected to " + FolioSession.getUrl() + " but API call failed (" +
-          e.message.split("\n")[0] +
-          "). Check Settings and make sure you are logged into FOLIO.";
-        showSettings();
-      }
     }
   }
 
@@ -835,25 +837,6 @@
     await switchToTenant(newTenant, newUrl || null);
     updateTenantBar();
 
-    var needsSetup = false;
-    try {
-      var mapVal = JSON.parse(els.agencyMap.value);
-      if (!mapVal || Object.keys(mapVal).length === 0) {
-        needsSetup = true;
-      } else {
-        needsSetup = Object.values(mapVal).every(function (v) { return !v; });
-      }
-    } catch (_) {
-      needsSetup = true;
-    }
-
-    if (needsSetup) {
-      els.detectStatus.style.display = "block";
-      els.detectMsg.textContent =
-        "Switched to " + newTenant + ". Fill in agency code names in Settings before generating.";
-      showSettings();
-    } else {
-      els.detectStatus.style.display = "none";
-    }
+    els.detectStatus.style.display = "none";
   });
 })();
