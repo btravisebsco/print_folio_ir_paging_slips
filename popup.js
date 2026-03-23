@@ -10,7 +10,7 @@
 
   // ======================== CACHED MAPS ========================
   var cachedAgencyCodeMap = {};   // { centralServerId: { agencyCode: description } }
-  var cachedPatronCodeMap = {};   // { centralServerId: { centralPatronType: description } }
+  var cachedPatronCodeMap = {};   // { centralServerCode: { centralPatronType: description } }
   var cachedLocalServerCode = "";
 
   // ======================== DOM REFS ========================
@@ -397,9 +397,9 @@
 
     var hold = txn.hold || {};
     var pickupParts = (hold.pickupLocation || "").split(":");
-    var centralServerId = hold.centralServerId || "";
+    var centralServerCode = txn.centralServerCode || hold.centralServerCode || "";
     var transactionObj = {
-      centralServerCode: hold.centralServerCode || "",
+      centralServerCode: centralServerCode,
       localServerCode: localServerCode || "",
       pickupLocationPrintName: pickupParts.length > 2 ? pickupParts[2] : "",
       pickupLocationCode: pickupParts.length > 0 ? pickupParts[0] : "",
@@ -410,7 +410,7 @@
       itemAgencyDescription: agencyCodeMap[hold.itemAgencyCode] || "",
       patronName: hold.patronName || "",
       patronTypeCode: hold.centralPatronType || "",
-      patronTypeDescription: (patronCodeMap[centralServerId] || {})[hold.centralPatronType] || "",
+      patronTypeDescription: (patronCodeMap[centralServerCode] || {})[hold.centralPatronType] || "",
     };
 
     return { item: itemObj, innReachTransaction: transactionObj };
@@ -572,20 +572,26 @@
         console.warn("[PagingSlips] Agency code fetch error:", e.message);
       }
 
-      // Fetch patron type mappings
+      // Build server ID → code mapping
+      var serverIdToCode = {};
+      centralServers.forEach(function (cs) {
+        serverIdToCode[cs.id] = cs.centralServerCode || cs.id;
+      });
+
+      // Fetch patron type mappings (keyed by centralServerCode)
       try {
         var ptData = await FolioSession.folioGet("/inn-reach/central-servers/patron-types");
         var csPatronTypes = ptData.centralServerPatronTypes || [];
         cachedPatronCodeMap = {};
         csPatronTypes.forEach(function (cpt) {
-          var csId = cpt.centralServerId || "";
+          var csCode = serverIdToCode[cpt.centralServerId] || cpt.centralServerId || "";
           var map = {};
           (cpt.patronTypes || []).forEach(function (pt) {
             if (pt.centralPatronType != null && pt.description) {
               map[pt.centralPatronType] = pt.description;
             }
           });
-          cachedPatronCodeMap[csId] = map;
+          cachedPatronCodeMap[csCode] = map;
         });
       } catch (e) {
         console.warn("[PagingSlips] Patron type fetch error:", e.message);
