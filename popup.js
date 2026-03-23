@@ -36,6 +36,7 @@
     centralServerId: document.getElementById("central-server-id"),
     singleLookup: document.getElementById("single-lookup"),
     btnSingle: document.getElementById("btn-single"),
+    tokenPreview: document.getElementById("token-preview"),
   };
 
   // ======================== PER-TENANT SETTINGS ========================
@@ -74,6 +75,28 @@
       ? "⚙ Hide Settings"
       : "⚙ Settings";
   });
+
+  // ======================== DEBUG TOKENS TOGGLE ========================
+
+  function buildTokenReferenceHTML(ctx) {
+    var rows = "";
+    function addRows(prefix, obj) {
+      Object.keys(obj).forEach(function (k) {
+        var fullKey = prefix + "." + k;
+        var val = obj[k];
+        var display = val != null && val !== "" ? escapeHtml(String(val)) : '<em style="color:#999;">(empty)</em>';
+        rows += "<tr><td style='padding:2px 8px;font-family:monospace;font-size:12px;white-space:nowrap;'>{{" + fullKey + "}}</td>" +
+          "<td style='padding:2px 8px;font-size:12px;'>" + display + "</td></tr>";
+      });
+    }
+    addRows("item", ctx.item || {});
+    addRows("innReachTransaction", ctx.innReachTransaction || {});
+    return '<table style="border-collapse:collapse;margin-top:12px;border:1px solid #ccc;width:100%;">' +
+      '<caption style="font-weight:bold;font-size:13px;padding:6px;text-align:left;background:#f0f0f0;">Available Tokens</caption>' +
+      '<thead><tr style="background:#e8e8e8;"><th style="padding:4px 8px;text-align:left;font-size:12px;">Token</th>' +
+      '<th style="padding:4px 8px;text-align:left;font-size:12px;">Value</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+  }
 
   // ======================== HELPERS ========================
 
@@ -338,10 +361,13 @@
       });
 
       setStatus("Rendering " + contextObjs.length + " slips…", "info");
+      var isPreview = els.tokenPreview.checked;
       const slips = contextObjs.map(function (ctx) {
+        var body = renderMustache(template, ctx);
+        if (isPreview) body += buildTokenReferenceHTML(ctx);
         return (
           '<div style="page-break-after: always;">' +
-          renderMustache(template, ctx) +
+          body +
           "</div>"
         );
       });
@@ -492,9 +518,12 @@
       const template = templateData.template;
 
       const contextObj = buildSlipContext(match, item, agencyCodeMap, cachedPatronCodeMap, cachedLocalServerCode);
+      var isPreview = els.tokenPreview.checked;
+      var body = renderMustache(template, contextObj);
+      if (isPreview) body += buildTokenReferenceHTML(contextObj);
       const rendered =
         '<div style="page-break-after: always;">' +
-        renderMustache(template, contextObj) +
+        body +
         "</div>";
 
       const fullHTML =
