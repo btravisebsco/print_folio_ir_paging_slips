@@ -373,7 +373,7 @@
       });
 
       const fullHTML =
-        "<!DOCTYPE html><html lang=\"en\"><head><title>Inn-Reach Paging Slips (" +
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Inn-Reach Paging Slips (" +
         slips.length + ")</title></head><body>" +
         (slips.length > 0 ? slips.join("\n") : "<p>No paging slips to print.</p>") +
         "</body></html>";
@@ -537,7 +537,7 @@
         "</div>";
 
       const fullHTML =
-        "<!DOCTYPE html><html lang=\"en\"><head><title>Inn-Reach Paging Slip \u2014 " +
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Inn-Reach Paging Slip \u2014 " +
         escapeHtml(item.barcode || match.trackingId) +
         "</title></head><body>" + rendered + "</body></html>";
 
